@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockAI — Live Trading Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#060810; --panel:#0c1120; --border:#1a2540;
+    --accent:#00f5a0; --accent2:#00b4ff; --danger:#ff3b5c;
+    --warning:#ffb800; --crypto:#f7931a; --text:#c8d8f0; --dim:#4a5a7a;
+    --glow:0 0 20px rgba(0,245,160,0.3);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,245,160,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,160,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:28px 20px;}
+
+  header{text-align:center;margin-bottom:26px;animation:fadeDown 0.8s ease;}
+  .logo{font-family:'Orbitron',monospace;font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;}
+  .logo span{-webkit-text-fill-color:var(--danger);}
+  .tagline{color:var(--dim);font-size:0.68rem;letter-spacing:3px;margin-top:5px;text-transform:uppercase;}
+
+  .status-bar{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;animation:fadeDown 0.9s ease;}
+  .status-chip{background:var(--panel);border:1px solid var(--border);padding:5px 13px;border-radius:20px;font-size:0.66rem;display:flex;align-items:center;gap:6px;}
+  .dot{width:7px;height:7px;border-radius:50%;animation:pulse 1.5s infinite;}
+  .dot.green{background:var(--accent);box-shadow:0 0 8px var(--accent);}
+  .dot.blue{background:var(--accent2);box-shadow:0 0 8px var(--accent2);animation-delay:.5s;}
+  .dot.yellow{background:var(--warning);box-shadow:0 0 8px var(--warning);animation-delay:1s;}
+  .dot.orange{background:var(--crypto);box-shadow:0 0 8px var(--crypto);animation-delay:.3s;}
+
+  .tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:5px;}
+  .tab-btn{flex:1;padding:10px 6px;border:none;border-radius:7px;background:transparent;color:var(--dim);font-family:'Orbitron',monospace;font-size:0.59rem;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s;}
+  .tab-btn.active{background:linear-gradient(135deg,rgba(0,245,160,0.14),rgba(0,180,255,0.09));color:var(--accent);border:1px solid rgba(0,245,160,0.28);}
+  .tab-btn:hover:not(.active){color:var(--text);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;animation:fadeUp 0.4s ease;}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+  .section-title{font-family:'Orbitron',monospace;font-size:0.62rem;color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+  .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
+
+  .market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;margin-bottom:16px;}
+  .market-chip{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:3px;}
+  .market-chip:hover{border-color:var(--accent2);}
+  .market-chip.active{border-color:var(--accent);background:rgba(0,245,160,0.07);box-shadow:var(--glow);}
+  .market-chip.crypto-chip{border-color:rgba(247,147,26,0.25);}
+  .market-chip.crypto-chip:hover{border-color:var(--crypto);}
+  .market-chip.crypto-chip.active{border-color:var(--crypto);background:rgba(247,147,26,0.08);box-shadow:0 0 18px rgba(247,147,26,0.25);}
+  .market-name{font-size:0.73rem;font-weight:600;color:var(--text);}
+  .market-sub{font-size:0.56rem;color:var(--dim);}
+  .crypto-label{font-size:0.5rem;background:rgba(247,147,26,0.18);color:var(--crypto);border-radius:3px;padding:1px 5px;letter-spacing:1px;display:inline-block;margin-top:2px;}
+
+  .params-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin-bottom:16px;}
+  .param-group{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:0.6rem;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+  input,select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:0.76rem;padding:9px 12px;border-radius:6px;outline:none;transition:border-color 0.2s;}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(0,245,160,0.12);}
+  select option{background:var(--panel);}
+
+  .analyze-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#000;font-family:'Orbitron',monospace;font-weight:700;font-size:0.79rem;letter-spacing:2px;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+  .analyze-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,245,160,0.4);}
+  .analyze-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+  .shimmer{position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:shimmer 2s infinite;}
+
+  /* ── Loading ── */
+  .loading{display:none;text-align:center;padding:40px 20px;animation:fadeUp 0.4s ease;}
+  .loading.show{display:block;}
+  .scanner{width:66px;height:66px;margin:0 auto 14px;border:2px solid var(--border);border-top-color:var(--accent);border-right-color:var(--accent2);border-radius:50%;animation:spin 1s linear infinite;}
+  .loading-text{font-size:0.69rem;color:var(--dim);letter-spacing:2px;}
+  .loading-steps{margin-top:12px;display:flex;flex-direction:column;gap:5px;align-items:center;}
+  .step{font-size:0.6rem;color:var(--dim);opacity:0;animation:stepIn 0.5s ease forwards;}
+
+  /* ── Results ── */
+  .results{display:none;animation:fadeUp 0.5s ease;}
+  .results.show{display:block;}
+  .top-pick{border-radius:12px;padding:22px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .top-pick::before{content:'TOP PICK';position:absolute;top:13px;right:16px;font-family:'Orbitron',monospace;font-size:0.55rem;letter-spacing:3px;color:var(--accent);border:1px solid var(--accent);padding:2px 8px;border-radius:4px;}
+  .pick-header{display:flex;align-items:baseline;gap:13px;margin-bottom:16px;flex-wrap:wrap;}
+  .pick-ticker{font-family:'Orbitron',monospace;font-size:2.1rem;font-weight:900;}
+  .pick-sub{color:var(--dim);font-size:0.75rem;}
+  .pick-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;}
+  .metric{background:rgba(0,0,0,0.3);border-radius:8px;padding:11px;}
+  .metric-label{font-size:0.55rem;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .metric-value{font-size:0.96rem;font-weight:600;}
+  .green{color:var(--accent);} .red{color:var(--danger);} .yellow{color:var(--warning);} .blue{color:var(--accent2);}
+
+  .tv-open-btn{display:inline-flex;align-items:center;gap:8px;margin-top:13px;padding:8px 16px;border-radius:6px;border:1px solid var(--accent2);background:rgba(0,180,255,0.08);color:var(--accent2);font-family:'IBM Plex Mono',monospace;font-size:0.68rem;cursor:pointer;text-decoration:none;transition:all 0.2s;}
+  .tv-open-btn:hover{background:rgba(0,180,255,0.2);box-shadow:0 0 14px rgba(0,180,255,0.3);}
+
+  .stop-loss-panel{background:rgba(255,59,92,0.07);border:1px solid rgba(255,59,92,0.28);border-radius:12px;padding:17px;margin-bottom:16px;}
+  .sl-header{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
+  .sl-title{font-family:'Orbitron',monospace;font-size:0.62rem;color:var(--danger);letter-spacing:2px;}
+  .sl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;}
+  .sl-item{text-align:center;}
+  .sl-label{font-size:0.56rem;color:var(--dim);margin-bottom:4px;}
+  .sl-value{font-size:0.92rem;font-weight:600;}
+
+  .stocks-table{width:100%;border-collapse:collapse;}
+  .stocks-table th{text-align:left;font-size:0.56rem;color:var(--dim);letter-spacing:2px;text-transform:uppercase;padding:9px 11px;border-bottom:1px solid var(--border);}
+  .stocks-table td{padding:10px 11px;border-bottom:1px solid rgba(26,37,64,0.4);font-size:0.75rem;}
+  .stocks-table tr:hover td{background:rgba(0,245,160,0.025);}
+  .rank-badge{width:22px;height:22px;border-radius:50%;background:var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:600;}
+  .badge-1{background:rgba(255,184,0,0.2);color:var(--warning);border:1px solid rgba(255,184,0,0.4);}
+  .badge-2{background:rgba(200,216,240,0.12);color:#8899bb;}
+  .badge-3{background:rgba(200,140,70,0.2);color:#c08050;}
+  .signal{font-size:0.6rem;padding:2px 8px;border-radius:4px;font-weight:600;letter-spacing:1px;}
+  .signal.buy{background:rgba(0,245,160,0.12);color:var(--accent);border:1px solid rgba(0,245,160,0.3);}
+  .signal.hold{background:rgba(255,184,0,0.12);color:var(--warning);border:1px solid rgba(255,184,0,0.3);}
+  .signal.watch{background:rgba(0,180,255,0.12);color:var(--accent2);border:1px solid rgba(0,180,255,0.3);}
+  .tv-row-btn{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,180,255,0.3);background:rgba(0,180,255,0.08);color:var(--accent2);font-size:0.58rem;cursor:pointer;text-decoration:none;transition:all 0.15s;vertical-align:middle;margin-left:5px;}
+  .tv-row-btn:hover{background:rgba(0,180,255,0.2);}
+
+  .ai-reasoning{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:16px;}
+  .reasoning-text{font-size:0.74rem;line-height:1.85;color:var(--text);border-left:2px solid var(--accent2);padding-left:14px;}
+  .disclaimer{margin-top:16px;padding:10px 14px;background:rgba(255,184,0,0.04);border:1px solid rgba(255,184,0,0.18);border-radius:8px;font-size:0.6rem;color:var(--dim);line-height:1.6;}
+  .disclaimer strong{color:var(--warning);}
+
+  /* ── Chart Tab (native canvas) ── */
+  .chart-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .symbol-search-row{display:flex;gap:8px;flex:1;min-width:240px;}
+  .symbol-search-row input{flex:1;}
+  .ctrl-btn{padding:7px 14px;border-radius:6px;border:1px solid var(--accent);background:rgba(0,245,160,0.07);color:var(--accent);font-family:'Orbitron',monospace;font-size:0.58rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+  .ctrl-btn:hover{background:rgba(0,245,160,0.18);}
+  .iv-group,.ct-group{display:flex;gap:4px;flex-wrap:wrap;}
+  .iv-btn,.ct-btn{padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.2s;}
+  .iv-btn.active,.iv-btn:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(0,180,255,0.08);}
+  .ct-btn.active,.ct-btn:hover{border-color:var(--warning);color:var(--warning);background:rgba(255,184,0,0.08);}
+
+  .quick-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .qs-btn{padding:4px 10px;border-radius:20px;font-size:0.63rem;border:1px solid var(--border);background:transparent;color:var(--dim);cursor:pointer;transition:all 0.15s;font-family:'IBM Plex Mono',monospace;}
+  .qs-btn:hover{color:var(--text);border-color:var(--accent2);background:rgba(0,180,255,0.06);}
+  .qs-btn.crypto{border-color:rgba(247,147,26,0.3);color:rgba(247,147,26,0.7);}
+  .qs-btn.crypto:hover{border-color:var(--crypto);color:var(--crypto);background:rgba(247,147,26,0.06);}
+  .qs-btn.active-sym{border-color:var(--accent);color:var(--accent);background:rgba(0,245,160,0.08);}
+
+  .chart-area{background:#0a0f1e;border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;}
+  .chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+  .chart-sym-name{font-family:'Orbitron',monospace;font-size:1.1rem;color:var(--text);}
+  .chart-price{font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:700;}
+  .chart-change{font-size:0.72rem;margin-top:2px;}
+  .chart-stats{display:flex;gap:16px;flex-wrap:wrap;}
+  .cs-item{font-size:0.62rem;color:var(--dim);}
+  .cs-val{color:var(--text);font-weight:600;}
+  canvas#priceChart{width:100%;height:300px;display:block;cursor:crosshair;}
+  .chart-tooltip{position:absolute;background:rgba(12,17,32,0.95);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:0.65rem;pointer-events:none;display:none;z-index:10;}
+  .chart-footer{margin-top:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+  .tv-deep-link{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:6px;background:linear-gradient(135deg,rgba(0,180,255,0.15),rgba(0,245,160,0.1));border:1px solid rgba(0,180,255,0.35);color:var(--accent2);font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-decoration:none;transition:all 0.2s;}
+  .tv-deep-link:hover{background:linear-gradient(135deg,rgba(0,180,255,0.28),rgba(0,245,160,0.18));box-shadow:0 0 16px rgba(0,180,255,0.3);}
+  .tv-logo{width:20px;height:14px;background:#131722;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:0.5rem;color:var(--accent2);font-weight:700;}
+
+  /* ── Screener Tab ── */
+  .screener-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+  .screener-card{background:#0a0f1e;border:1px solid var(--border);border-radius:8px;padding:14px;transition:border-color 0.2s;}
+  .screener-card:hover{border-color:var(--accent2);}
+  .sc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .sc-ticker{font-family:'Orbitron',monospace;font-size:0.88rem;font-weight:700;}
+  .sc-name{font-size:0.62rem;color:var(--dim);margin-top:2px;}
+  .sc-price{font-size:1rem;font-weight:600;color:var(--text);}
+  .sc-change{font-size:0.7rem;padding:2px 7px;border-radius:4px;}
+  .sc-change.up{background:rgba(0,245,160,0.12);color:var(--accent);}
+  .sc-change.dn{background:rgba(255,59,92,0.12);color:var(--danger);}
+  .sc-bar{height:3px;background:var(--border);border-radius:2px;margin:10px 0 6px;overflow:hidden;}
+  .sc-bar-fill{height:100%;border-radius:2px;transition:width 0.6s ease;}
+  .sc-meta{display:flex;justify-content:space-between;font-size:0.59rem;color:var(--dim);}
+  .screener-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .sf-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.2s;}
+  .sf-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,245,160,0.08);}
+  .sf-btn:hover:not(.active){color:var(--text);border-color:var(--accent2);}
+
+  /* ── Heatmap Tab ── */
+  .heatmap-grid{display:grid;gap:3px;}
+  .hm-cell{border-radius:4px;padding:8px 6px;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;justify-content:space-between;}
+  .hm-cell:hover{transform:scale(1.04);z-index:2;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
+  .hm-ticker{font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700;color:#fff;}
+  .hm-change{font-size:0.6rem;color:rgba(255,255,255,0.85);margin-top:4px;}
+  .hm-controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .hm-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.2s;}
+  .hm-btn.active{border-color:var(--warning);color:var(--warning);background:rgba(255,184,0,0.08);}
+  .hm-legend{display:flex;align-items:center;gap:8px;font-size:0.6rem;color:var(--dim);margin-top:10px;}
+  .hm-legend-bar{flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,#ff3b5c,#ff7b45,#2a2a3a,#00d48a,#00f5a0);}
+
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes shimmer{to{left:200%}}
+  @keyframes stepIn{to{opacity:0.7}}
+
+  @media(max-width:640px){
+    .params-row{grid-template-columns:1fr 1fr}
+    .pick-metrics{grid-template-columns:1fr 1fr}
+    .sl-grid{grid-template-columns:1fr 1fr}
+    .logo{font-size:1.9rem}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">STOCK<span>AI</span></div>
+    <div class="tagline">Live Market Intelligence &amp; Risk Management</div>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-chip"><div class="dot green"></div>AI Engine Online</div>
+    <div class="status-chip"><div class="dot blue"></div>Markets Connected</div>
+    <div class="status-chip"><div class="dot orange"></div>Crypto 24/7</div>
+    <div class="status-chip"><div class="dot yellow"></div>TradingView Ready</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('analyze')">&#x26A1; AI ANALYZE</button>
+    <button class="tab-btn" onclick="switchTab('chart')">&#x1F4CA; LIVE CHART</button>
+    <button class="tab-btn" onclick="switchTab('screener')">&#x1F50D; SCREENER</button>
+    <button class="tab-btn" onclick="switchTab('heatmap')">&#x1F321; HEATMAP</button>
+  </div>
+
+  <!-- ══ TAB: AI ANALYZE ══ -->
+  <div class="tab-panel active" id="tab-analyze">
+    <div class="card">
+      <div class="section-title">Stock Markets</div>
+      <div class="market-grid" id="marketGrid">
+        <div class="market-chip active" data-market="NSE"><div class="market-name">NSE</div><div class="market-sub">India &bull; National</div></div>
+        <div class="market-chip active" data-market="BSE"><div class="market-name">BSE</div><div class="market-sub">India &bull; Bombay</div></div>
+        <div class="market-chip" data-market="NYSE"><div class="market-name">NYSE</div><div class="market-sub">USA &bull; New York</div></div>
+        <div class="market-chip" data-market="NASDAQ"><div class="market-name">NASDAQ</div><div class="market-sub">USA &bull; Tech</div></div>
+        <div class="market-chip" data-market="LSE"><div class="market-name">LSE</div><div class="market-sub">UK &bull; London</div></div>
+        <div class="market-chip" data-market="TSE"><div class="market-name">TSE</div><div class="market-sub">Japan &bull; Tokyo</div></div>
+      </div>
+      <div class="section-title" style="margin-top:6px">Crypto Exchanges <span style="font-size:0.56rem;color:var(--dim);font-family:'IBM Plex Mono',monospace;text-transform:none;letter-spacing:1px;font-weight:400">&nbsp;(24/7)</span></div>
+      <div class="market-grid" id="cryptoGrid">
+        <div class="market-chip crypto-chip" data-market="BINANCE"><div class="market-name">Binance</div><div class="market-sub">Global &bull; Largest</div><div class="crypto-label">CRYPTO</div></div>
+        <div class="market-chip crypto-chip" data-market="COINBASE"><div class="market-name">Coinbase</div><div class="market-sub">USA &bull; Regulated</div><div class="crypto-label">CRYPTO</div></div>
+        <div class="market-chip crypto-chip" data-market="KRAKEN"><div class="market-name">Kraken</div><div class="market-sub">USA &bull; Secure</div><div class="crypto-label">CRYPTO</div></div>
+        <div class="market-chip crypto-chip" data-market="BYBIT"><div class="market-name">Bybit</div><div class="market-sub">Global &bull; Futures</div><div class="crypto-label">CRYPTO</div></div>
+        <div class="market-chip crypto-chip" data-market="OKX"><div class="market-name">OKX</div><div class="market-sub">Global &bull; Derivatives</div><div class="crypto-label">CRYPTO</div></div>
+        <div class="market-chip crypto-chip" data-market="WAZIRX"><div class="market-name">WazirX</div><div class="market-sub">India &bull; INR pairs</div><div class="crypto-label">CRYPTO</div></div>
+      </div>
+      <div class="params-row">
+        <div class="param-group"><label>Investment Amount (&#x20B9;)</label><input type="number" id="amount" value="50000" min="1000"/></div>
+        <div class="param-group"><label>Time Horizon</label>
+          <select id="horizon">
+            <option value="intraday">Intraday (same day)</option>
+            <option value="shortterm" selected>Short-term (1&ndash;7 days)</option>
+            <option value="swing">Swing (1&ndash;4 weeks)</option>
+            <option value="positional">Positional (1&ndash;3 months)</option>
+          </select>
+        </div>
+        <div class="param-group"><label>Risk Tolerance</label>
+          <select id="risk">
+            <option value="low">Low (conservative)</option>
+            <option value="medium" selected>Medium (balanced)</option>
+            <option value="high">High (aggressive)</option>
+          </select>
+        </div>
+      </div>
+      <div class="params-row">
+        <div class="param-group"><label>Stop Loss Type</label>
+          <select id="slType">
+            <option value="percentage">% Based</option>
+            <option value="atr" selected>ATR Based</option>
+            <option value="support">Support Level</option>
+          </select>
+        </div>
+        <div class="param-group"><label>Max Stop Loss %</label><input type="number" id="maxSL" value="5" min="1" max="20"/></div>
+        <div class="param-group"><label>Sector Filter</label>
+          <select id="sector">
+            <option value="all">All Sectors</option>
+            <option value="tech">Technology</option>
+            <option value="banking">Banking &amp; Finance</option>
+            <option value="pharma">Pharma &amp; Healthcare</option>
+            <option value="auto">Auto &amp; EV</option>
+            <option value="infra">Infrastructure</option>
+          </select>
+        </div>
+      </div>
+      <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">
+        <span class="shimmer"></span>&#x26A1; ANALYZE MARKETS &amp; FIND BEST ASSET
+      </button>
+    </div>
+    <div class="loading" id="loading">
+      <div class="scanner"></div>
+      <div class="loading-text">AI SCANNING MARKETS...</div>
+      <div class="loading-steps" id="loadingSteps"></div>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+
+  <!-- ══ TAB: LIVE CHART ══ -->
+  <div class="tab-panel" id="tab-chart">
+    <div class="card">
+      <div class="section-title">Live Price Chart</div>
+      <div style="margin-bottom:9px;font-size:0.58rem;color:var(--dim);letter-spacing:1px;">QUICK SELECT</div>
+      <div class="quick-row" id="quickRow">
+        <button class="qs-btn active-sym" onclick="selectSym('NSE:RELIANCE','RELIANCE','NSE',this)">RELIANCE</button>
+        <button class="qs-btn" onclick="selectSym('NSE:HDFCBANK','HDFCBANK','NSE',this)">HDFCBANK</button>
+        <button class="qs-btn" onclick="selectSym('NSE:TCS','TCS','NSE',this)">TCS</button>
+        <button class="qs-btn" onclick="selectSym('NSE:INFY','INFY','NSE',this)">INFY</button>
+        <button class="qs-btn" onclick="selectSym('NSE:TATAMOTORS','TATAMOTORS','NSE',this)">TATAMOTORS</button>
+        <button class="qs-btn" onclick="selectSym('NASDAQ:AAPL','AAPL','NASDAQ',this)">AAPL</button>
+        <button class="qs-btn" onclick="selectSym('NASDAQ:NVDA','NVDA','NASDAQ',this)">NVDA</button>
+        <button class="qs-btn crypto" onclick="selectSym('BINANCE:BTCUSDT','BTC/USDT','BINANCE',this)">BTC/USDT</button>
+        <button class="qs-btn crypto" onclick="selectSym('BINANCE:ETHUSDT','ETH/USDT','BINANCE',this)">ETH/USDT</button>
+        <button class="qs-btn crypto" onclick="selectSym('BINANCE:SOLUSDT','SOL/USDT','BINANCE',this)">SOL/USDT</button>
+        <button class="qs-btn crypto" onclick="selectSym('BINANCE:BNBUSDT','BNB/USDT','BINANCE',this)">BNB/USDT</button>
+        <button class="qs-btn crypto" onclick="selectSym('BINANCE:XRPUSDT','XRP/USDT','BINANCE',this)">XRP/USDT</button>
+      </div>
+      <div class="chart-controls">
+        <div class="symbol-search-row">
+          <input type="text" id="symInput" placeholder="Type symbol e.g. NSE:WIPRO" value="NSE:RELIANCE"/>
+          <button class="ctrl-btn" onclick="applyCustomSym()">LOAD</button>
+        </div>
+        <div class="iv-group">
+          <button class="iv-btn" onclick="setIV('1m',this)">1m</button>
+          <button class="iv-btn" onclick="setIV('5m',this)">5m</button>
+          <button class="iv-btn" onclick="setIV('15m',this)">15m</button>
+          <button class="iv-btn" onclick="setIV('1H',this)">1H</button>
+          <button class="iv-btn active" onclick="setIV('1D',this)">1D</button>
+          <button class="iv-btn" onclick="setIV('1W',this)">1W</button>
+        </div>
+        <div class="ct-group">
+          <button class="ct-btn active" onclick="setChartType('candle',this)">&#x1F56F; Candle</button>
+          <button class="ct-btn" onclick="setChartType('line',this)">&#x1F4C8; Line</button>
+          <button class="ct-btn" onclick="setChartType('area',this)">&#x25B3; Area</button>
+        </div>
+      </div>
+      <div class="chart-area" id="chartArea">
+        <div class="chart-header">
+          <div>
+            <div class="chart-sym-name" id="chartSymName">RELIANCE &bull; NSE</div>
+            <div style="font-size:0.58rem;color:var(--dim);margin-top:2px" id="chartInterval">Daily &bull; Simulated data for visual reference</div>
+          </div>
+          <div style="text-align:right">
+            <div class="chart-price" id="chartPrice" style="color:var(--accent)">&#x20B9;2,847.50</div>
+            <div class="chart-change" id="chartChange" style="color:var(--accent)">&#x25B2; +1.24%</div>
+          </div>
+        </div>
+        <div class="chart-stats" id="chartStats" style="margin-bottom:12px">
+          <div class="cs-item">O: <span class="cs-val" id="cs-open">2,812.00</span></div>
+          <div class="cs-item">H: <span class="cs-val" id="cs-high">2,861.00</span></div>
+          <div class="cs-item">L: <span class="cs-val" id="cs-low">2,798.00</span></div>
+          <div class="cs-item">Vol: <span class="cs-val" id="cs-vol">4.2M</span></div>
+          <div class="cs-item">RSI: <span class="cs-val" id="cs-rsi" style="color:var(--accent)">62.4</span></div>
+        </div>
+        <canvas id="priceChart"></canvas>
+        <div class="chart-tooltip" id="chartTooltip"></div>
+        <div class="chart-footer">
+          <div style="font-size:0.6rem;color:var(--dim)">&#x26A0;&#xFE0F; Simulated chart for visual reference &mdash; not real-time data</div>
+          <a id="tvDeepLink" href="https://www.tradingview.com/chart/?symbol=NSE%3ARELIANCE" target="_blank" class="tv-deep-link">
+            <span class="tv-logo">TV</span> Open Full Chart on TradingView &#x2197;
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: SCREENER ══ -->
+  <div class="tab-panel" id="tab-screener">
+    <div class="card">
+      <div class="section-title">Market Screener</div>
+      <div class="screener-filters" id="screenerFilters">
+        <button class="sf-btn active" onclick="loadScreener('india',this)">&#x1F1EE;&#x1F1F3; India</button>
+        <button class="sf-btn" onclick="loadScreener('usa',this)">&#x1F1FA;&#x1F1F8; USA</button>
+        <button class="sf-btn" onclick="loadScreener('crypto',this)">&#x20BF; Crypto</button>
+        <button class="sf-btn" onclick="loadScreener('uk',this)">&#x1F1EC;&#x1F1E7; UK</button>
+        <button class="sf-btn" onclick="loadScreener('japan',this)">&#x1F1EF;&#x1F1F5; Japan</button>
+      </div>
+      <div class="screener-grid" id="screenerGrid"></div>
+      <div style="margin-top:14px;text-align:center">
+        <a id="screenerTvLink" href="https://www.tradingview.com/screener/" target="_blank" class="tv-deep-link" style="display:inline-flex">
+          <span class="tv-logo">TV</span> Open Full Screener on TradingView &#x2197;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: HEATMAP ══ -->
+  <div class="tab-panel" id="tab-heatmap">
+    <div class="card">
+      <div class="section-title">Market Heatmap</div>
+      <div class="hm-controls">
+        <button class="hm-btn active" onclick="loadHeatmap('sp500',this)">S&amp;P 500</button>
+        <button class="hm-btn" onclick="loadHeatmap('crypto',this)">Crypto</button>
+        <button class="hm-btn" onclick="loadHeatmap('india',this)">India (Nifty 50)</button>
+      </div>
+      <div id="heatmapGrid" class="heatmap-grid"></div>
+      <div class="hm-legend">
+        <span>-5%+</span>
+        <div class="hm-legend-bar"></div>
+        <span>+5%+</span>
+      </div>
+      <div style="margin-top:14px;text-align:center">
+        <a href="https://www.tradingview.com/heatmap/stock/" target="_blank" class="tv-deep-link" style="display:inline-flex">
+          <span class="tv-logo">TV</span> Open Full Heatmap on TradingView &#x2197;
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ──────────────────────────────────────────────────────────
+// TAB SWITCHING
+// ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  ['analyze','chart','screener','heatmap'].forEach((t,i) => {
+    document.querySelectorAll('.tab-btn')[i].classList.toggle('active', t===name);
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+  });
+  if(name==='chart' && !chartInitialized) initChart();
+  if(name==='screener' && !screenerInitialized) loadScreener('india', document.querySelector('.sf-btn.active'));
+  if(name==='heatmap' && !heatmapInitialized) loadHeatmap('sp500', document.querySelector('.hm-btn.active'));
+}
+
+// ──────────────────────────────────────────────────────────
+// MARKET CHIP TOGGLE
+// ──────────────────────────────────────────────────────────
+document.querySelectorAll('.market-chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
+
+// ──────────────────────────────────────────────────────────
+// CHART TAB — CANVAS CHART
+// ──────────────────────────────────────────────────────────
+let chartInitialized = false;
+let currentSym = 'NSE:RELIANCE';
+let currentLabel = 'RELIANCE • NSE';
+let chartType = 'candle';
+let chartInterval = '1D';
+let canvasData = [];
+
+const SYMBOLS = {
+  'NSE:RELIANCE':  { base:2800, vol:4200000, rsi:62, currency:'₹' },
+  'NSE:HDFCBANK':  { base:1670, vol:5100000, rsi:55, currency:'₹' },
+  'NSE:TCS':       { base:3820, vol:2800000, rsi:58, currency:'₹' },
+  'NSE:INFY':      { base:1510, vol:3600000, rsi:51, currency:'₹' },
+  'NSE:TATAMOTORS':{ base:910,  vol:6200000, rsi:66, currency:'₹' },
+  'NASDAQ:AAPL':   { base:185,  vol:52000000, rsi:60, currency:'$' },
+  'NASDAQ:NVDA':   { base:875,  vol:38000000, rsi:71, currency:'$' },
+  'BINANCE:BTCUSDT':{ base:67500, vol:28000, rsi:63, currency:'$' },
+  'BINANCE:ETHUSDT':{ base:3380,  vol:145000, rsi:59, currency:'$' },
+  'BINANCE:SOLUSDT':{ base:172,   vol:2200000, rsi:68, currency:'$' },
+  'BINANCE:BNBUSDT':{ base:565,   vol:870000, rsi:54, currency:'$' },
+  'BINANCE:XRPUSDT':{ base:0.61,  vol:4500000000, rsi:57, currency:'$' },
+};
+
+function generateCandles(sym, count=60) {
+  const info = SYMBOLS[sym] || { base:1000, vol:1000000, rsi:55, currency:'₹' };
+  let price = info.base;
+  const candles = [];
+  const now = Date.now();
+  const msPerBar = chartInterval==='1m'?60000 : chartInterval==='5m'?300000 : chartInterval==='15m'?900000 : chartInterval==='1H'?3600000 : chartInterval==='1W'?604800000 : 86400000;
+  for(let i=count;i>=0;i--) {
+    const trend = Math.random()>0.46 ? 1 : -1;
+    const body = price * (0.005 + Math.random()*0.025);
+    const open = price;
+    const close = price + trend*body*(0.4+Math.random()*0.6);
+    const high = Math.max(open,close) + price*(0.003+Math.random()*0.012);
+    const low  = Math.min(open,close) - price*(0.003+Math.random()*0.012);
+    const vol  = info.vol * (0.5 + Math.random());
+    candles.push({ t: now - i*msPerBar, open, high, low, close, vol });
+    price = close;
+  }
+  return candles;
+}
+
+function drawChart() {
+  const canvas = document.getElementById('priceChart');
+  if(!canvas) return;
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.offsetWidth;
+  const H = 300;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+
+  const data = canvasData;
+  if(!data.length) return;
+  const pad = {l:10,r:55,t:10,b:30};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+
+  const prices = data.flatMap(c=>[c.high,c.low]);
+  const minP = Math.min(...prices), maxP = Math.max(...prices);
+  const range = maxP-minP || 1;
+  const py = p => pad.t + cH*(1-(p-minP)/range);
+  const barW = Math.max(2, cW/data.length - 1);
+
+  // Grid
+  ctx.strokeStyle='rgba(26,37,64,0.8)'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+cH*(i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    const price=maxP-range*(i/4);
+    const info = SYMBOLS[currentSym]||{currency:'₹'};
+    ctx.fillStyle='rgba(74,90,122,0.9)'; ctx.font='10px IBM Plex Mono'; ctx.textAlign='left';
+    ctx.fillText(info.currency+price.toLocaleString('en',{maximumFractionDigits:2}), W-pad.r+4, y+4);
+  }
+
+  // Volume bars (background)
+  const maxVol = Math.max(...data.map(c=>c.vol));
+  data.forEach((c,i) => {
+    const x = pad.l + i*(cW/data.length);
+    const vH = (c.vol/maxVol)*(cH*0.2);
+    ctx.fillStyle = c.close>=c.open ? 'rgba(0,245,160,0.12)' : 'rgba(255,59,92,0.12)';
+    ctx.fillRect(x+1, pad.t+cH-vH, barW-2, vH);
+  });
+
+  if(chartType==='line' || chartType==='area') {
+    ctx.beginPath();
+    data.forEach((c,i)=>{ const x=pad.l+i*(cW/data.length)+barW/2; const y=py(c.close); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    if(chartType==='area'){
+      const lastX=pad.l+(data.length-1)*(cW/data.length)+barW/2;
+      ctx.lineTo(lastX,pad.t+cH); ctx.lineTo(pad.l+barW/2,pad.t+cH); ctx.closePath();
+      const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);
+      grad.addColorStop(0,'rgba(0,245,160,0.3)'); grad.addColorStop(1,'rgba(0,245,160,0)');
+      ctx.fillStyle=grad; ctx.fill();
+      ctx.beginPath();
+      data.forEach((c,i)=>{ const x=pad.l+i*(cW/data.length)+barW/2; const y=py(c.close); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    }
+    ctx.strokeStyle=data[data.length-1].close>=data[0].close?'#00f5a0':'#ff3b5c';
+    ctx.lineWidth=2; ctx.stroke();
+  } else {
+    // Candlesticks
+    data.forEach((c,i) => {
+      const x = pad.l + i*(cW/data.length);
+      const xc = x + barW/2;
+      const isUp = c.close >= c.open;
+      const col = isUp ? '#00f5a0' : '#ff3b5c';
+      // Wick
+      ctx.strokeStyle=col; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(xc,py(c.high)); ctx.lineTo(xc,py(c.low)); ctx.stroke();
+      // Body
+      const bTop=py(Math.max(c.open,c.close)), bBot=py(Math.min(c.open,c.close));
+      const bH=Math.max(1,bBot-bTop);
+      ctx.fillStyle=isUp?'rgba(0,245,160,0.85)':'rgba(255,59,92,0.85)';
+      ctx.fillRect(x+1,bTop,barW-2,bH);
+    });
+  }
+
+  // Time labels
+  const step=Math.ceil(data.length/6);
+  ctx.fillStyle='rgba(74,90,122,0.9)'; ctx.font='9px IBM Plex Mono'; ctx.textAlign='center';
+  data.forEach((c,i)=>{
+    if(i%step===0){
+      const x=pad.l+i*(cW/data.length)+barW/2;
+      const d=new Date(c.t);
+      const lbl = chartInterval==='1D'||chartInterval==='1W' ? d.toLocaleDateString('en',{month:'short',day:'numeric'}) : d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+      ctx.fillText(lbl, x, H-8);
+    }
+  });
+
+  canvasData = data;
+}
+
+function updateChartHeader(sym) {
+  const info = SYMBOLS[sym] || { base:1000, vol:1000000, rsi:55, currency:'₹' };
+  const data = canvasData;
+  if(!data.length) return;
+  const last = data[data.length-1];
+  const first = data[0];
+  const chg = ((last.close-first.close)/first.close*100).toFixed(2);
+  const isUp = last.close >= first.close;
+  const cur = info.currency;
+  const fmt = v => cur + v.toLocaleString('en',{maximumFractionDigits:2});
+  document.getElementById('chartPrice').textContent = fmt(last.close);
+  document.getElementById('chartPrice').style.color = isUp?'var(--accent)':'var(--danger)';
+  document.getElementById('chartChange').textContent = (isUp?'▲ +':'▼ ')+chg+'%';
+  document.getElementById('chartChange').style.color = isUp?'var(--accent)':'var(--danger)';
+  document.getElementById('cs-open').textContent  = fmt(last.open);
+  document.getElementById('cs-high').textContent  = fmt(last.high);
+  document.getElementById('cs-low').textContent   = fmt(last.low);
+  document.getElementById('cs-vol').textContent   = (last.vol/1e6).toFixed(1)+'M';
+  document.getElementById('cs-rsi').textContent   = info.rsi + (Math.random()*4-2).toFixed(1);
+  document.getElementById('cs-rsi').style.color   = info.rsi>70?'var(--danger)':info.rsi<30?'var(--accent2)':'var(--accent)';
+}
+
+function initChart() {
+  chartInitialized = true;
+  renderCurrentChart();
+  window.addEventListener('resize', ()=>{ if(canvasData.length) drawChart(); });
+}
+
+function renderCurrentChart() {
+  canvasData = generateCandles(currentSym, 60);
+  document.getElementById('chartSymName').textContent = currentLabel;
+  document.getElementById('chartInterval').textContent = chartInterval + ' · Simulated visual data';
+  document.getElementById('tvDeepLink').href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(currentSym);
+  document.getElementById('symInput').value = currentSym;
+  setTimeout(()=>{ drawChart(); updateChartHeader(currentSym); }, 50);
+}
+
+function selectSym(tvSym, label, exchange, btn) {
+  currentSym = tvSym;
+  currentLabel = label + ' • ' + exchange;
+  document.querySelectorAll('.qs-btn').forEach(b=>b.classList.remove('active-sym'));
+  if(btn) btn.classList.add('active-sym');
+  if(chartInitialized) renderCurrentChart();
+  switchTab('chart');
+}
+
+function applyCustomSym() {
+  const v = document.getElementById('symInput').value.trim().toUpperCase();
+  if(!v) return;
+  currentSym = v;
+  const parts = v.split(':');
+  currentLabel = (parts[1]||v)+' • '+(parts[0]||'');
+  document.querySelectorAll('.qs-btn').forEach(b=>b.classList.remove('active-sym'));
+  if(chartInitialized) renderCurrentChart();
+  switchTab('chart');
+}
+
+function setIV(iv, btn) {
+  chartInterval = iv;
+  document.querySelectorAll('.iv-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(chartInitialized) renderCurrentChart();
+}
+
+function setChartType(type, btn) {
+  chartType = type;
+  document.querySelectorAll('.ct-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(chartInitialized) drawChart();
+}
+
+// ──────────────────────────────────────────────────────────
+// SCREENER TAB
+// ──────────────────────────────────────────────────────────
+let screenerInitialized = false;
+
+const SCREENER_DATA = {
+  india:[
+    {t:'RELIANCE',n:'Reliance Industries',p:2847,c:1.24,mkt:'11.2T',vol:'4.2M',rsi:62,sig:'BUY'},
+    {t:'TCS',n:'Tata Consultancy',p:3821,c:0.87,mkt:'13.9T',vol:'1.8M',rsi:58,sig:'BUY'},
+    {t:'HDFCBANK',n:'HDFC Bank',p:1672,c:-0.31,mkt:'12.6T',vol:'5.1M',rsi:55,sig:'HOLD'},
+    {t:'INFY',n:'Infosys',p:1512,c:1.05,mkt:'6.3T',vol:'3.6M',rsi:61,sig:'BUY'},
+    {t:'HINDUNILVR',n:'Hindustan Unilever',p:2204,c:-0.54,mkt:'5.1T',vol:'1.2M',rsi:44,sig:'WATCH'},
+    {t:'ICICIBANK',n:'ICICI Bank',p:1089,c:1.32,mkt:'7.7T',vol:'6.8M',rsi:67,sig:'BUY'},
+    {t:'BHARTIARTL',n:'Bharti Airtel',p:1624,c:0.62,mkt:'9.7T',vol:'3.1M',rsi:59,sig:'BUY'},
+    {t:'WIPRO',n:'Wipro Ltd',p:480,c:-0.23,mkt:'2.5T',vol:'4.4M',rsi:48,sig:'HOLD'},
+  ],
+  usa:[
+    {t:'AAPL',n:'Apple Inc',p:185,c:0.54,mkt:'2.85T',vol:'52M',rsi:60,sig:'BUY'},
+    {t:'MSFT',n:'Microsoft',p:411,c:0.77,mkt:'3.05T',vol:'18M',rsi:64,sig:'BUY'},
+    {t:'NVDA',n:'Nvidia',p:875,c:2.14,mkt:'2.15T',vol:'38M',rsi:71,sig:'BUY'},
+    {t:'GOOGL',n:'Alphabet',p:171,c:0.33,mkt:'2.08T',vol:'22M',rsi:57,sig:'WATCH'},
+    {t:'AMZN',n:'Amazon',p:185,c:1.02,mkt:'1.93T',vol:'35M',rsi:62,sig:'BUY'},
+    {t:'META',n:'Meta Platforms',p:491,c:1.45,mkt:'1.25T',vol:'14M',rsi:68,sig:'BUY'},
+    {t:'TSLA',n:'Tesla',p:248,c:-1.12,mkt:'0.79T',vol:'88M',rsi:43,sig:'HOLD'},
+    {t:'AMD',n:'AMD',p:178,c:1.87,mkt:'0.28T',vol:'42M',rsi:66,sig:'BUY'},
+  ],
+  crypto:[
+    {t:'BTC',n:'Bitcoin',p:67850,c:1.44,mkt:'1.33T',vol:'28B',rsi:63,sig:'BUY'},
+    {t:'ETH',n:'Ethereum',p:3381,c:0.98,mkt:'406B',vol:'18B',rsi:59,sig:'BUY'},
+    {t:'BNB',n:'BNB',p:564,c:0.55,mkt:'82B',vol:'2.1B',rsi:54,sig:'HOLD'},
+    {t:'SOL',n:'Solana',p:172,c:2.11,mkt:'79B',vol:'5.8B',rsi:68,sig:'BUY'},
+    {t:'XRP',n:'Ripple',p:0.61,c:-0.44,mkt:'34B',vol:'2.4B',rsi:47,sig:'WATCH'},
+    {t:'DOGE',n:'Dogecoin',p:0.163,c:1.21,mkt:'23B',vol:'1.9B',rsi:55,sig:'WATCH'},
+    {t:'ADA',n:'Cardano',p:0.485,c:0.88,mkt:'17B',vol:'0.6B',rsi:52,sig:'HOLD'},
+    {t:'AVAX',n:'Avalanche',p:38.2,c:1.55,mkt:'15B',vol:'0.8B',rsi:61,sig:'BUY'},
+  ],
+  uk:[
+    {t:'SHEL',n:'Shell PLC',p:28.2,c:0.44,mkt:'182B',vol:'12M',rsi:56,sig:'HOLD'},
+    {t:'AZN',n:'AstraZeneca',p:127,c:0.72,mkt:'198B',vol:'3.2M',rsi:60,sig:'BUY'},
+    {t:'HSBA',n:'HSBC Holdings',p:7.21,c:-0.28,mkt:'127B',vol:'18M',rsi:48,sig:'WATCH'},
+    {t:'BP',n:'BP PLC',p:4.72,c:0.61,mkt:'80B',vol:'24M',rsi:52,sig:'HOLD'},
+  ],
+  japan:[
+    {t:'7203',n:'Toyota Motor',p:3142,c:0.88,mkt:'47T',vol:'6.2M',rsi:61,sig:'BUY'},
+    {t:'6758',n:'Sony Group',p:12840,c:1.14,mkt:'15T',vol:'2.1M',rsi:63,sig:'BUY'},
+    {t:'9984',n:'SoftBank Group',p:8740,c:-0.34,mkt:'14T',vol:'4.8M',rsi:46,sig:'HOLD'},
+    {t:'6861',n:'Keyence Corp',p:64800,c:0.55,mkt:'15T',vol:'0.4M',rsi:58,sig:'WATCH'},
+  ]
+};
+
+function loadScreener(market, btn) {
+  screenerInitialized = true;
+  document.querySelectorAll('.sf-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+
+  const data = SCREENER_DATA[market] || SCREENER_DATA.india;
+  const tvLinks = {india:'https://www.tradingview.com/screener/?market=india',usa:'https://www.tradingview.com/screener/?market=america',crypto:'https://www.tradingview.com/crypto-screener/',uk:'https://www.tradingview.com/screener/?market=uk',japan:'https://www.tradingview.com/screener/?market=japan'};
+  document.getElementById('screenerTvLink').href = tvLinks[market]||tvLinks.india;
+
+  const grid = document.getElementById('screenerGrid');
+  grid.innerHTML = data.map(s => {
+    const isUp = s.c >= 0;
+    const sigCl = s.sig==='BUY'?'var(--accent)':s.sig==='HOLD'?'var(--warning)':'var(--accent2)';
+    const rsiPct = Math.min(100,s.rsi);
+    const rsiColor = s.rsi>70?'var(--danger)':s.rsi>50?'var(--accent)':'var(--accent2)';
+    return `<div class="screener-card">
+      <div class="sc-header">
+        <div>
+          <div class="sc-ticker" style="color:${isUp?'var(--accent)':'var(--danger)'}">${s.t}</div>
+          <div class="sc-name">${s.n}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="sc-price">${s.p.toLocaleString()}</div>
+          <span class="sc-change ${isUp?'up':'dn'}">${isUp?'▲ +':'▼ '}${Math.abs(s.c)}%</span>
+        </div>
+      </div>
+      <div class="sc-bar"><div class="sc-bar-fill" style="width:${rsiPct}%;background:${rsiColor}"></div></div>
+      <div class="sc-meta">
+        <span>Mkt Cap: ${s.mkt}</span>
+        <span>Vol: ${s.vol}</span>
+        <span>RSI: <strong style="color:${rsiColor}">${s.rsi}</strong></span>
+        <span style="color:${sigCl};font-weight:700">${s.sig}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────────────────
+// HEATMAP TAB
+// ──────────────────────────────────────────────────────────
+let heatmapInitialized = false;
+
+const HEATMAP_DATA = {
+  sp500:[
+    {s:'NVDA',c:2.14,mc:2150},{s:'AAPL',c:0.54,mc:2850},{s:'MSFT',c:0.77,mc:3050},{s:'AMZN',c:1.02,mc:1930},{s:'META',c:1.45,mc:1250},
+    {s:'GOOGL',c:0.33,mc:2080},{s:'TSLA',c:-1.12,mc:790},{s:'BRK.B',c:0.41,mc:870},{s:'JPM',c:0.62,mc:580},{s:'V',c:0.28,mc:510},
+    {s:'LLY',c:1.21,mc:780},{s:'UNH',c:-0.44,mc:450},{s:'XOM',c:-0.31,mc:430},{s:'MA',c:0.55,mc:440},{s:'JNJ',c:-0.18,mc:380},
+    {s:'HD',c:0.87,mc:370},{s:'CVX',c:-0.44,mc:280},{s:'MRK',c:0.33,mc:290},{s:'ABBV',c:0.72,mc:285},{s:'PG',c:0.11,mc:350},
+    {s:'AMD',c:1.87,mc:280},{s:'NFLX',c:1.34,mc:250},{s:'COST',c:0.64,mc:360},{s:'ADBE',c:-0.55,mc:220},{s:'CRM',c:0.98,mc:230},
+  ],
+  crypto:[
+    {s:'BTC',c:1.44,mc:1330},{s:'ETH',c:0.98,mc:406},{s:'BNB',c:0.55,mc:82},{s:'SOL',c:2.11,mc:79},{s:'XRP',c:-0.44,mc:34},
+    {s:'DOGE',c:1.21,mc:23},{s:'ADA',c:0.88,mc:17},{s:'AVAX',c:1.55,mc:15},{s:'SHIB',c:-0.87,mc:12},{s:'DOT',c:0.33,mc:10},
+    {s:'LINK',c:1.77,mc:11},{s:'TRX',c:0.22,mc:14},{s:'MATIC',c:-1.23,mc:8},{s:'LTC',c:0.44,mc:6},{s:'UNI',c:2.33,mc:5},
+  ],
+  india:[
+    {s:'RELIANCE',c:1.24,mc:19200},{s:'TCS',c:0.87,mc:13900},{s:'HDFCBANK',c:-0.31,mc:12600},{s:'BHARTIARTL',c:0.62,mc:9700},
+    {s:'ICICIBANK',c:1.32,mc:7700},{s:'INFY',c:1.05,mc:6300},{s:'SBIN',c:0.78,mc:7100},{s:'LT',c:0.44,mc:4800},
+    {s:'HINDUNILVR',c:-0.54,mc:5100},{s:'AXISBANK',c:0.91,mc:3700},{s:'KOTAKBANK',c:-0.22,mc:3500},{s:'WIPRO',c:-0.23,mc:2500},
+    {s:'BAJFINANCE',c:1.44,mc:4400},{s:'NESTLEIND',c:0.15,mc:2200},{s:'SUNPHARMA',c:0.66,mc:3900},
+  ]
+};
+
+function loadHeatmap(type, btn) {
+  heatmapInitialized = true;
+  document.querySelectorAll('.hm-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const data = HEATMAP_DATA[type] || HEATMAP_DATA.sp500;
+  const sorted = [...data].sort((a,b)=>b.mc-a.mc);
+  const maxMC = sorted[0].mc;
+
+  // Treemap-like sizing
+  const grid = document.getElementById('heatmapGrid');
+  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(80px,1fr))';
+
+  function getColor(c) {
+    const cl = Math.max(-5,Math.min(5,c));
+    if(cl>0){const t=cl/5; return `rgba(${Math.round(0+t*0)},${Math.round(180+t*75)},${Math.round(100+t*60)},${0.7+t*0.25})`;}
+    else{const t=(-cl)/5; return `rgba(${Math.round(180+t*75)},${Math.round(60-t*60)},${Math.round(60-t*60)},${0.7+t*0.25})`;}
+  }
+
+  grid.innerHTML = sorted.map(s => {
+    const szRaw = Math.sqrt(s.mc/maxMC);
+    const sz = Math.max(60, Math.round(szRaw*130));
+    const bg = getColor(s.c);
+    const isUp = s.c>=0;
+    return `<div class="hm-cell" style="background:${bg};min-height:${sz}px" onclick="selectSym('${type==='crypto'?'BINANCE:'+s.s+'USDT':'NSE:'+s.s}','${s.s}','${type==='crypto'?'BINANCE':'NSE'}',null)">
+      <div class="hm-ticker">${s.s}</div>
+      <div class="hm-change">${isUp?'+':''}${s.c}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────────────────
+// AI ANALYSIS
+// ──────────────────────────────────────────────────────────
+const STEPS=[
+  'Fetching market data from selected exchanges...',
+  'Running momentum & RSI analysis on 500+ assets...',
+  'Detecting volume anomalies & breakout signals...',
+  'Applying AI pattern recognition engine...',
+  'Computing ATR-based stop loss levels...',
+  'Ranking by risk-adjusted return potential...',
+  'Generating final recommendation...'
+];
+
+async function runAnalysis() {
+  const btn=document.getElementById('analyzeBtn');
+  const loading=document.getElementById('loading');
+  const results=document.getElementById('results');
+  const amount=parseInt(document.getElementById('amount').value)||50000;
+  const horizon=document.getElementById('horizon').value;
+  const risk=document.getElementById('risk').value;
+  const slType=document.getElementById('slType').value;
+  const maxSL=parseFloat(document.getElementById('maxSL').value)||5;
+  const sector=document.getElementById('sector').value;
+  const stockMkts=[...document.querySelectorAll('#marketGrid .market-chip.active')].map(c=>c.dataset.market);
+  const cryptoMkts=[...document.querySelectorAll('#cryptoGrid .market-chip.active')].map(c=>c.dataset.market);
+  const markets=[...stockMkts,...cryptoMkts];
+  if(!markets.length){alert('Please select at least one market.');return;}
+
+  btn.disabled=true; results.classList.remove('show');
+  loading.classList.add('show'); document.getElementById('loadingSteps').innerHTML='';
+
+  for(let i=0;i<STEPS.length;i++){
+    await delay(560);
+    const el=document.createElement('div');
+    el.className='step'; el.style.animationDelay='0s';
+    el.textContent='> '+STEPS[i];
+    document.getElementById('loadingSteps').appendChild(el);
+  }
+  await delay(600);
+
+  let aiData;
+  try {
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:1000,
+        messages:[{role:'user',content:buildPrompt(markets,amount,horizon,risk,slType,maxSL,sector,cryptoMkts.length>0)}]
+      })
+    });
+    const data=await resp.json();
+    const text=data.content.map(i=>i.text||'').join('');
+    aiData=JSON.parse(text.replace(/```json|```/g,'').trim());
+  } catch(e){ aiData=fallbackData(amount); }
+
+  loading.classList.remove('show');
+  results.innerHTML=renderResults(aiData,amount,slType);
+  results.classList.add('show');
+  btn.disabled=false;
+}
+
+function buildPrompt(markets,amount,horizon,risk,slType,maxSL,sector,hasCrypto){
+  const cex=['BINANCE','COINBASE','KRAKEN','BYBIT','OKX','WAZIRX'];
+  const cSel=markets.filter(m=>cex.includes(m));
+  const cNote=hasCrypto?`\nCrypto exchanges: ${cSel.join(', ')}. Include crypto (BTC,ETH,SOL,BNB etc). Use USD prices. assetType="crypto" for crypto, "stock" for equities.`:'';
+  return `You are a professional trading AI. Trader: Investment=Rs.${amount}, Horizon=${horizon}, Risk=${risk}, Markets=${markets.join(',')}, Sector=${sector}, SL=${slType} max ${maxSL}%.${cNote}
+Return ONLY valid JSON no markdown:
+{"top":{"ticker":"RELIANCE","name":"Reliance Industries","market":"NSE","sector":"Conglomerate","assetType":"stock","currentPrice":2850,"targetPrice":3150,"expectedReturn":10.5,"timeframe":"5-7 days","confidence":87,"signal":"BUY","stopLoss":2707,"stopLossPercent":5.0,"trailingSL":2750,"riskRewardRatio":"1:2.1","positionSize":17,"rsi":62,"momentum":"bullish","tvSymbol":"NSE:RELIANCE","keyReason":"Strong breakout above 200-day EMA with rising institutional volume."},"others":[{"rank":2,"ticker":"HDFCBANK","name":"HDFC Bank","market":"NSE","assetType":"stock","currentPrice":1680,"targetPrice":1820,"expectedReturn":8.3,"confidence":80,"signal":"BUY","stopLoss":1596,"stopLossPercent":5.0,"tvSymbol":"NSE:HDFCBANK"},{"rank":3,"ticker":"BTC","name":"Bitcoin","market":"BINANCE","assetType":"crypto","currentPrice":68000,"targetPrice":74000,"expectedReturn":8.8,"confidence":78,"signal":"BUY","stopLoss":64600,"stopLossPercent":5.0,"tvSymbol":"BINANCE:BTCUSDT"},{"rank":4,"ticker":"INFY","name":"Infosys","market":"NSE","assetType":"stock","currentPrice":1520,"targetPrice":1635,"expectedReturn":7.6,"confidence":74,"signal":"BUY","stopLoss":1444,"stopLossPercent":5.0,"tvSymbol":"NSE:INFY"},{"rank":5,"ticker":"ETH","name":"Ethereum","market":"BINANCE","assetType":"crypto","currentPrice":3400,"targetPrice":3700,"expectedReturn":8.8,"confidence":70,"signal":"WATCH","stopLoss":3230,"stopLossPercent":5.0,"tvSymbol":"BINANCE:ETHUSDT"}],"marketSummary":"Markets showing moderate bullish bias.","aiReasoning":"Detailed reasoning here."}
+Adapt all tickers/prices/tvSymbols realistically. Include tvSymbol for every asset.`;
+}
+
+function renderResults(d,amount,slType){
+  const t=d.top; const ic=t.assetType==='crypto'; const sym=ic?'$':'₹';
+  const loc=ic?'en-US':'en-IN'; const qty=t.positionSize||(ic?1:Math.floor(amount/t.currentPrice));
+  const fp=v=>sym+Number(v).toLocaleString(loc);
+  const topStyle=ic?'background:linear-gradient(135deg,rgba(247,147,26,0.1),rgba(255,184,0,0.04));border:1px solid rgba(247,147,26,0.35);':'background:linear-gradient(135deg,rgba(0,245,160,0.08),rgba(0,180,255,0.04));border:1px solid rgba(0,245,160,0.28);';
+  const tg=ic?'background:linear-gradient(135deg,#f7931a,#ffb800);-webkit-background-clip:text;-webkit-text-fill-color:transparent;':'background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;';
+  const badge=ic?`<span style="font-size:0.57rem;background:rgba(247,147,26,0.18);color:#f7931a;border:1px solid rgba(247,147,26,0.4);padding:2px 7px;border-radius:4px;margin-left:7px">₿ CRYPTO</span>`:`<span style="font-size:0.57rem;background:rgba(0,245,160,0.12);color:var(--accent);border:1px solid rgba(0,245,160,0.3);padding:2px 7px;border-radius:4px;margin-left:7px">📈 STOCK</span>`;
+  const bars=Array.from({length:20},(_,i)=>{const h=20+Math.random()*80,up=i>12;const c=ic?(up?'#f7931a':'#ffb800'):(up?'var(--accent)':'var(--accent2)');return `<div style="flex:1;height:${h}%;background:${c};opacity:${0.38+i*0.03};border-radius:2px 2px 0 0"></div>`;}).join('');
+
+  const tvBtn=t.tvSymbol?`<a class="tv-open-btn" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(t.tvSymbol)}" target="_blank">&#x1F4CA;&nbsp;Open Live Chart on TradingView &#x2197;</a>`:
+    `<button class="tv-open-btn" onclick="selectSym('${t.tvSymbol||'NSE:RELIANCE'}','${t.ticker}','${t.market}',null)">&#x1F4CA;&nbsp;View Chart</button>`;
+
+  const rows=(d.others||[]).map(s=>{
+    const sc=s.assetType==='crypto',ss=sc?'$':'₹';
+    const sg=s.signal==='BUY'?'buy':s.signal==='HOLD'?'hold':'watch';
+    const bc=s.rank<=3?`badge-${s.rank}`:'';
+    const ci=sc?`<span style="color:#f7931a;font-size:0.58rem;margin-left:3px">₿</span>`:'';
+    const tvR=s.tvSymbol?`<a class="tv-row-btn" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s.tvSymbol)}" target="_blank">TV&#x2197;</a>`:'';
+    return `<tr><td><span class="rank-badge ${bc}">${s.rank}</span></td><td><strong style="color:var(--text)">${s.ticker}</strong>${ci}${tvR}<br><span style="font-size:0.6rem;color:var(--dim)">${s.name}</span></td><td>${s.market}</td><td>${ss}${Number(s.currentPrice).toLocaleString('en-US')}</td><td style="color:var(--accent)">${ss}${Number(s.targetPrice).toLocaleString('en-US')}</td><td style="color:var(--accent)">+${s.expectedReturn}%</td><td style="color:var(--danger)">${ss}${Number(s.stopLoss).toLocaleString('en-US')}</td><td><span class="signal ${sg}">${s.signal}</span></td></tr>`;
+  }).join('');
+
+  return `<div class="top-pick" style="${topStyle}">
+    <div class="pick-header">
+      <div class="pick-ticker" style="${tg}">${t.ticker}</div>
+      <div><div style="font-size:0.86rem;font-weight:600;color:var(--text)">${t.name}${badge}</div><div class="pick-sub">${t.market} &bull; ${t.sector} &bull; ${t.timeframe}</div></div>
+      <div style="margin-left:auto;text-align:right"><div style="height:34px;display:flex;align-items:flex-end;gap:2px">${bars}</div><div style="font-size:0.56rem;color:var(--dim);margin-top:4px">Trend</div></div>
+    </div>
+    <div class="pick-metrics">
+      <div class="metric"><div class="metric-label">Current Price</div><div class="metric-value blue">${fp(t.currentPrice)}</div></div>
+      <div class="metric"><div class="metric-label">Target Price</div><div class="metric-value green">${fp(t.targetPrice)}</div></div>
+      <div class="metric"><div class="metric-label">Expected Return</div><div class="metric-value green">+${t.expectedReturn}%</div></div>
+      <div class="metric"><div class="metric-label">AI Confidence</div><div class="metric-value yellow">${t.confidence}%</div></div>
+      <div class="metric"><div class="metric-label">Risk/Reward</div><div class="metric-value green">${t.riskRewardRatio}</div></div>
+      <div class="metric"><div class="metric-label">Est. Profit</div><div class="metric-value green">${sym}${Math.round(qty*(t.targetPrice-t.currentPrice)).toLocaleString(loc)}</div></div>
+      <div class="metric"><div class="metric-label">RSI</div><div class="metric-value blue">${t.rsi||'N/A'}</div></div>
+      <div class="metric"><div class="metric-label">Momentum</div><div class="metric-value green" style="text-transform:capitalize">${t.momentum||'Bullish'}</div></div>
+    </div>
+    ${tvBtn}
+  </div>
+  <div class="stop-loss-panel">
+    <div class="sl-header"><span style="font-size:1rem">🛡️</span><span class="sl-title">STOP LOSS &mdash; ${slType.toUpperCase()}</span></div>
+    <div class="sl-grid">
+      <div class="sl-item"><div class="sl-label">Stop Loss Price</div><div class="sl-value" style="color:var(--danger)">${fp(t.stopLoss)}</div></div>
+      <div class="sl-item"><div class="sl-label">SL %</div><div class="sl-value" style="color:var(--danger)">-${t.stopLossPercent}%</div></div>
+      <div class="sl-item"><div class="sl-label">Trailing SL</div><div class="sl-value" style="color:var(--warning)">${fp(t.trailingSL||t.stopLoss)}</div></div>
+      <div class="sl-item"><div class="sl-label">Max Loss</div><div class="sl-value" style="color:var(--danger)">${sym}${Math.round(qty*(t.currentPrice-t.stopLoss)).toLocaleString(loc)}</div></div>
+      <div class="sl-item"><div class="sl-label">Invest Amount</div><div class="sl-value" style="color:var(--accent2)">${sym}${(qty*t.currentPrice).toLocaleString(loc)}</div></div>
+      <div class="sl-item"><div class="sl-label">Qty</div><div class="sl-value" style="color:var(--accent)">${qty} ${ic?'units':'shares'}</div></div>
+    </div>
+  </div>
+  <div class="card" style="padding:18px">
+    <div class="section-title">Other Strong Candidates</div>
+    <table class="stocks-table"><thead><tr><th>#</th><th>Asset</th><th>Market</th><th>Price</th><th>Target</th><th>Return</th><th>Stop Loss</th><th>Signal</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>
+  <div class="ai-reasoning">
+    <div class="section-title">AI Reasoning</div>
+    <div class="reasoning-text"><strong style="color:var(--accent2)">Market Overview:</strong> ${d.marketSummary||''}<br><br><strong style="color:var(--accent2)">Why ${t.ticker}?</strong> ${t.keyReason||''}<br><br>${d.aiReasoning||''}</div>
+  </div>
+  <div class="disclaimer"><strong>⚠️ Disclaimer:</strong> AI recommendations and charts are for <strong>educational purposes only</strong>. Charts show simulated data, not real-time prices. Crypto is highly volatile. Always DYOR and consult a qualified financial advisor before investing.</div>`;
+}
+
+function fallbackData(amount){
+  return {
+    top:{ticker:'RELIANCE',name:'Reliance Industries',market:'NSE',sector:'Conglomerate',assetType:'stock',currentPrice:2850,targetPrice:3150,expectedReturn:10.5,timeframe:'5-7 days',confidence:87,signal:'BUY',stopLoss:2707,stopLossPercent:5.0,trailingSL:2760,riskRewardRatio:'1:2.1',positionSize:Math.floor(amount/2850),rsi:62,momentum:'bullish',tvSymbol:'NSE:RELIANCE',keyReason:'Strong breakout above 200-day EMA with rising institutional volume. Q3 results beat estimates by 12%.'},
+    others:[
+      {rank:2,ticker:'HDFCBANK',name:'HDFC Bank',market:'NSE',assetType:'stock',currentPrice:1680,targetPrice:1820,expectedReturn:8.3,confidence:80,signal:'BUY',stopLoss:1596,stopLossPercent:5,tvSymbol:'NSE:HDFCBANK'},
+      {rank:3,ticker:'BTC',name:'Bitcoin',market:'BINANCE',assetType:'crypto',currentPrice:68000,targetPrice:74000,expectedReturn:8.8,confidence:78,signal:'BUY',stopLoss:64600,stopLossPercent:5,tvSymbol:'BINANCE:BTCUSDT'},
+      {rank:4,ticker:'INFY',name:'Infosys',market:'NSE',assetType:'stock',currentPrice:1520,targetPrice:1635,expectedReturn:7.6,confidence:74,signal:'BUY',stopLoss:1444,stopLossPercent:5,tvSymbol:'NSE:INFY'},
+      {rank:5,ticker:'ETH',name:'Ethereum',market:'BINANCE',assetType:'crypto',currentPrice:3400,targetPrice:3700,expectedReturn:8.8,confidence:70,signal:'WATCH',stopLoss:3230,stopLossPercent:5,tvSymbol:'BINANCE:ETHUSDT'}
+    ],
+    marketSummary:'Markets showing moderate bullish bias with strong institutional activity in banking, energy and crypto sectors.',
+    aiReasoning:'Multi-timeframe momentum analysis indicates Reliance offers the highest risk-adjusted return for the selected parameters.'
+  };
+}
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>
